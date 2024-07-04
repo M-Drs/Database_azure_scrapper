@@ -1,0 +1,150 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "type": "string",
+            "metadata": "Data Factory name",
+            "defaultValue": "python170591"
+        },
+        "storageLinkedService_connectionString": {
+            "type": "secureString",
+            "metadata": "Secure string for 'connectionString' of 'storageLinkedService'"
+        },
+        "batchLinkedService_accessKey": {
+            "type": "secureString",
+            "metadata": "Secure string for 'accessKey' of 'batchLinkedService'"
+        },
+        "batchLinkedService_properties_typeProperties_batchUri": {
+            "type": "string",
+            "defaultValue": "https://datainge.francecentral.batch.azure.com"
+        },
+        "batchLinkedService_properties_typeProperties_poolName": {
+            "type": "string",
+            "defaultValue": "pythonpool"
+        },
+        "batchLinkedService_properties_typeProperties_accountName": {
+            "type": "string",
+            "defaultValue": "datainge"
+        }
+    },
+    "variables": {
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('factoryName'), '/storageLinkedService')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureStorage",
+                "typeProperties": {
+                    "connectionString": "[parameters('storageLinkedService_connectionString')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/batchLinkedService')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureBatch",
+                "typeProperties": {
+                    "batchUri": "[parameters('batchLinkedService_properties_typeProperties_batchUri')]",
+                    "poolName": "[parameters('batchLinkedService_properties_typeProperties_poolName')]",
+                    "accountName": "[parameters('batchLinkedService_properties_typeProperties_accountName')]",
+                    "linkedServiceName": {
+                        "referenceName": "storageLinkedService",
+                        "type": "LinkedServiceReference"
+                    },
+                    "accessKey": {
+                        "type": "SecureString",
+                        "value": "[parameters('batchLinkedService_accessKey')]"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/storageLinkedService')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/PythonPipeline')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Python_Run",
+                        "type": "Custom",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "0.12:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "command": "python script_hello.py",
+                            "resourceLinkedService": {
+                                "referenceName": "storageLinkedService",
+                                "type": "LinkedServiceReference"
+                            },
+                            "folderPath": "filestorage",
+                            "referenceObjects": {
+                                "linkedServices": [],
+                                "datasets": []
+                            }
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "batchLinkedService",
+                            "type": "LinkedServiceReference"
+                        }
+                    }
+                ],
+                "policy": {
+                    "elapsedTimeMetric": {}
+                },
+                "annotations": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/batchLinkedService')]",
+                "[concat(variables('factoryId'), '/linkedServices/storageLinkedService')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/pythontrigger')]",
+            "type": "Microsoft.DataFactory/factories/triggers",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "runtimeState": "Started",
+                "pipelines": [
+                    {
+                        "pipelineReference": {
+                            "referenceName": "PythonPipeline",
+                            "type": "PipelineReference"
+                        },
+                        "parameters": {}
+                    }
+                ],
+                "type": "ScheduleTrigger",
+                "typeProperties": {
+                    "recurrence": {
+                        "frequency": "Minute",
+                        "interval": 15,
+                        "startTime": "2024-06-26T10:09:00",
+                        "timeZone": "Romance Standard Time"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/pipelines/PythonPipeline')]"
+            ]
+        }
+    ]
+}
